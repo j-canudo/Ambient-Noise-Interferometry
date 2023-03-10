@@ -964,19 +964,20 @@ classdef HDASdata < handle
                 error('No FK calculated. Ending.');
             end
 
-            obj.w = [-w:1/120:w];
-            obj.c = [vel(1):1/100:vel(2)];
-            obj.dispersionVelocity2D = zeros(length(obj.w),length(obj.c));
-
-            mask = logical(ones(size(obj.FK)));
             k_axis = linspace(-1/obj.Spatial_Sampling_Meters/2,1/obj.Spatial_Sampling_Meters/2,size(obj.FK,1));
             f_axis = linspace(-obj.Trigger_Frequency/2,obj.Trigger_Frequency/2,size(obj.FK,2));
             v_matrix = k_axis.'*(1./f_axis);
             delta_f = obj.Trigger_Frequency/size(obj.FK,2);
+            delta_k = (1/obj.Spatial_Sampling_Meters)/size(obj.FK,1);
+            delta_v = delta_f/delta_k;
+
+            obj.c = [vel(1):delta_v:vel(2)];
+            obj.w = [-w:delta_f:w];
+            obj.dispersionVelocity2D = zeros(length(obj.c),length(obj.w));
 
             for i=1:length(obj.c)
                 v_min = 1/obj.c(i);
-                v_max = 1/obj.c(i+1);
+                v_max = v_min + delta_v;
 
                 mask1 = v_matrix<v_min;
                 mask1 = mask1 & v_matrix>-v_min;
@@ -988,8 +989,16 @@ classdef HDASdata < handle
                 x(~mask) = 0;
 
                 for j=1:length(obj.w)
-                    obj.dispersionVelocity2D(i,j) = sum(sum(abs(x(:,size(x,2)/2+(obj.w(j)/delta_f):size(x,2)/2+(obj.w(j+1)/delta_f)))));
+                    obj.dispersionVelocity2D(i,j) = sum(abs(x(:,size(x,2)/2+(obj.w(j)/delta_f))));
                 end
+            end
+
+            obj.dispersionVelocity2D = obj.dispersionVelocity2D.';
+
+            obj.max_dispersion_velocities = zeros(1,length(obj.w));
+            for i=1:length(obj.w)
+                [~,index] = max(abs(obj.dispersionVelocity2D(i,:)));
+                obj.max_dispersion_velocities(1,i) = obj.c(index);
             end
         end
     end

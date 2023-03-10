@@ -1,10 +1,10 @@
 tic
 clear all;
 close all;
-path = 'E:\Submarino\Tanda5';
+path = 'C:\Users\jcanu\Desktop\Universidad\TFM\RawData\Submarino';
 c = HDASdata(path);
 c.number_of_files = 10;
-total_files = 7200;
+total_files =60;
 
 for i=1:total_files/c.number_of_files
     fprintf('Iteration %d of %d\n',i,total_files/c.number_of_files);
