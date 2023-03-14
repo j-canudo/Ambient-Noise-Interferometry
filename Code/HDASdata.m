@@ -915,12 +915,15 @@ classdef HDASdata < handle
             end
         end
 
-        function obj = calculateDispersionVelocity(obj, vel)
+        function obj = calculateDispersionVelocity(obj, vel, cut_time)
             if isempty(obj.PWS)
                 error('No PWS calculated. Ending.');
             end
-
-            NCF_cut = obj.PWS(:,(size(obj.PWS,2)+1)/2-60*obj.Trigger_Frequency:(size(obj.PWS,2)+1)/2+60*obj.Trigger_Frequency);
+            if ~isempty(cut_time)
+                NCF_cut = obj.PWS(:,(size(obj.PWS,2)+1)/2-cut_time*obj.Trigger_Frequency:(size(obj.PWS,2)+1)/2+cut_time*obj.Trigger_Frequency);
+            else
+                NCF_cut = obj.PWS;
+            end
 
             obj.w = linspace(-obj.Trigger_Frequency/2,obj.Trigger_Frequency/2,size(NCF_cut,2));
             obj.c = linspace(vel(1),vel(2),5000);
