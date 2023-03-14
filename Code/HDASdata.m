@@ -712,11 +712,12 @@ classdef HDASdata < handle
             end
         end
 
-        function obj = savePWSdata(obj,file_number)
+        function obj = savePWSdata(obj,file_number,path)
             if mod(obj.processed_files,file_number) == 0
                 PWS = obj.PWS;
                 n = obj.processed_files;
-                save('A23PWS_save.mat','PWS','n');
+                file_name = strcat(path,'\A23PWS_',num2str(n),'files.mat');
+                save(file_name,'PWS','n');
             end
         end
 
