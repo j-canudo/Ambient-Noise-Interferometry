@@ -798,7 +798,7 @@ classdef HDASdata < handle
             colorbar;
         end
 
-        function obj = filterFK(obj,freq,k,v,direction)
+        function obj = filterFK(obj,freq,k,v,direction,keep)
             obj.calculateFK;
             mask = logical(ones(size(obj.FK)));
             k_axis = linspace(-1/obj.Spatial_Sampling_Meters/2,1/obj.Spatial_Sampling_Meters/2,size(obj.FK,1));
@@ -852,8 +852,15 @@ classdef HDASdata < handle
 
             filt = imgaussfilt(mask,3);
             mask = mask.*filt;
-
-            obj.FK(~mask) = 0;
+            if isequal(keep,'keep')
+                obj.FK(~mask) = 0;
+            end
+            if isequal(keep,'discard')
+                obj.FK(mask) = 0;
+            end
+            if ~isequal(keep,'keep') && ~isequal(keep,'discard')
+                error('Last argument should be keep or discard.');
+            end
             obj.FK = flip(obj.FK,1);
             recovered_strain = real(ifft2(ifftshift(obj.FK),size(obj.Strain2D,1),size(obj.Strain2D,2)));
             obj.Strain2D = recovered_strain(1:size(obj.Strain2D,1),1:size(obj.Strain2D,2));
@@ -926,7 +933,7 @@ classdef HDASdata < handle
             end
 
             obj.w = linspace(-obj.Trigger_Frequency/2,obj.Trigger_Frequency/2,size(NCF_cut,2));
-            obj.c = linspace(vel(1),vel(2),5000);
+            obj.c = linspace(vel(1),vel(2),1000);
             X_ij = fftshift(fft(NCF_cut,[],2),2);
             obj.dispersionVelocity2D = zeros(length(obj.w),length(obj.c));
             suma = 0;
