@@ -298,6 +298,7 @@ classdef HDASdata < handle
 
     methods
         function obj = HDASdata(path)
+            tic;
             obj.data_path = path;
             obj.files_dir = dir(path);
             obj.files_dir = obj.files_dir(~ismember({obj.files_dir.name},{'.','..','$RECYCLE.BIN','System Volume Information'}));
@@ -686,7 +687,8 @@ classdef HDASdata < handle
             if isempty(obj.PWS)
                 obj.PWS = zeros(size(obj.S_MS));
             end
-            obj.PWS = obj.PWS + ((abs(obj.phase_MS)/obj.stacked_files).^obj.gamma).*(obj.S_MS/(obj.stacked_files));
+            x = ((abs(obj.phase_MS)/obj.stacked_files).^obj.gamma).*(obj.S_MS/(obj.stacked_files));
+            obj.PWS = obj.PWS + flip(x,2);
             obj.phase_MS = [];
             obj.S_MS = [];
             obj.stacked_files = 0;
@@ -729,6 +731,7 @@ classdef HDASdata < handle
             xlabel('Offset (m)');
             ylabel('Time (s)');
             title('PWS');
+            set(gca,'YDir','normal');
             clim([-1e3 1e3]);
         end
 
@@ -749,6 +752,7 @@ classdef HDASdata < handle
             xlabel('Time lag(s)');
             ylabel('Offset (m)');
             title('PWS');
+            set(gca,'YDir','normal');
             xlim([-obj.time_to_correlate obj.time_to_correlate]);
             ylim([-5 obj.N_Processed_Points*obj.Spatial_Sampling_Meters+5]);
         end
@@ -775,6 +779,7 @@ classdef HDASdata < handle
         function obj = calculateFK(obj)
             %obj.FK = fftshift(fft2(obj.Strain2D,size(obj.Strain2D,1)*2,size(obj.Strain2D,2)*2));
             obj.FK = fftshift(fft2(obj.Strain2D));
+            obj.FK = flip(obj.FK,1);
         end
 
         function obj = plotFK(obj)
@@ -793,7 +798,7 @@ classdef HDASdata < handle
             colorbar;
         end
 
-        function obj = filterFK(obj,freq,k,v)
+        function obj = filterFK(obj,freq,k,v,direction)
             obj.calculateFK;
             mask = logical(ones(size(obj.FK)));
             k_axis = linspace(-1/obj.Spatial_Sampling_Meters/2,1/obj.Spatial_Sampling_Meters/2,size(obj.FK,1));
@@ -833,7 +838,23 @@ classdef HDASdata < handle
                 mask(length(k_axis)/2-k_min/delta_k:length(k_axis)/2+k_min/delta_k,:) = false; %Eliminate k<k_min
             end
 
+            if isequal(direction,'normal')
+                a = ones(size(obj.FK)/2);
+                b = zeros(size(obj.FK)/2);
+                mask = [b a;a b];
+            end
+            if isequal(direction,'reverse')
+                a = ones(size(obj.FK)/2);
+                b = zeros(size(obj.FK)/2);
+                mask = [a b; b a];
+            end
+            mask = double(mask);
+
+            filt = imgaussfilt(mask,3);
+            mask = mask.*filt;
+
             obj.FK(~mask) = 0;
+            obj.FK = flip(obj.FK,1);
             recovered_strain = real(ifft2(ifftshift(obj.FK),size(obj.Strain2D,1),size(obj.Strain2D,2)));
             obj.Strain2D = recovered_strain(1:size(obj.Strain2D,1),1:size(obj.Strain2D,2));
         end
@@ -894,17 +915,15 @@ classdef HDASdata < handle
             end
         end
 
-        function obj = calculateDispersionVelocity(obj, w, vel)
+        function obj = calculateDispersionVelocity(obj, vel)
             if isempty(obj.PWS)
                 error('No PWS calculated. Ending.');
             end
 
-            obj.PWS = flip(obj.PWS,1);
+            NCF_cut = obj.PWS(:,(size(obj.PWS,2)+1)/2-60*obj.Trigger_Frequency:(size(obj.PWS,2)+1)/2+60*obj.Trigger_Frequency);
 
-            NCF_cut = obj.PWS(:,(size(obj.PWS,2)+1)/2-60:(size(obj.PWS,2)+1)/2+60);
-
-            obj.w = [-w:1/120:w];
-            obj.c = [vel(1):1/100:vel(2)];
+            obj.w = linspace(-obj.Trigger_Frequency/2,obj.Trigger_Frequency/2,size(NCF_cut,2));
+            obj.c = linspace(vel(1),vel(2),5000);
             X_ij = fftshift(fft(NCF_cut,[],2),2);
             obj.dispersionVelocity2D = zeros(length(obj.w),length(obj.c));
             suma = 0;
@@ -991,6 +1010,17 @@ classdef HDASdata < handle
                     obj.dispersionVelocity2D(i,j) = sum(sum(abs(x(:,size(x,2)/2+(obj.w(j)/delta_f):size(x,2)/2+(obj.w(j+1)/delta_f)))));
                 end
             end
+        end
+    end
+
+    methods(Static)
+        function displayComputationTime
+            timer = toc;
+            hours = floor(timer/3600);
+            timer = timer - hours*3600;
+            minutes = floor(timer/60);
+            seconds = round(timer - minutes*60);
+            fprintf('Total computation time: %d hours %d minutes %d seconds.\n',hours,minutes,seconds);
         end
     end
 end
