@@ -606,6 +606,16 @@ classdef HDASdata < handle
             title('Normalized n\epsilon');
         end
 
+        function obj = detrendData(obj)
+            x = 1:size(obj.Strain2D,2);
+            for i=1:obj.N_Processed_Points
+                y = obj.Strain2D(i,:);
+                m = (sum(x.*y)-sum(x)*sum(y)/numel(x))/(sum(x.^2)-sum(x)^2/numel(x));
+                b = mean(y) - m*mean(x);
+                obj.Strain2D(i,:) = y - (m*x + b);
+            end
+        end
+
         function obj = temporalNormalization(obj)
             [env,~] = envelope(obj.Strain2D.');
             norm_env = env/size(env,1);
