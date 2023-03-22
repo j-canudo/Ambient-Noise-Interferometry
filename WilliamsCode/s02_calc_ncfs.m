@@ -3,14 +3,16 @@ close all
 tic
 %datafile = './data/Fs1Hz_dx10m_Belgium_data.mat';
 %datafile = './data/Fs1Hz_dx10m_Tarifa_data.mat';
-datafile = './data/Fs1Hz_dx10m_A23_data.mat';
+%datafile = './data/Fs1Hz_dx10m_A23_data.mat';
+datafile = './data/Fs5Hz_dx10m_A23_data.mat';
 outdir = './ncfs/';
 
 %Set parameters
-fs = 1;
+fs = 5;
 dx = 10;
 fmin = 0.03;
 fmax = 5;
+vel = [10 2000];
 nns = 2^9; %number of samples in a subwindow
 nnw = nns/2+1; %number of samples in RFFT
 nov = floor(nns/2);
@@ -54,7 +56,7 @@ for i=1:nf
         for src_index=1:length(src_list)
             src = src_list(src_index);
             rec_arr = src:src+nr-1;
-            xc = get_src_gather_fk(data,src,rec_arr,nx,nns,nnw,nwn,nov,fmin,fmax,fs,dx,sgn);
+            xc = get_src_gather_fk(data,src,rec_arr,nx,nns,nnw,nwn,nov,fmin,fmax,fs,dx,sgn,vel);
             %Save
             filename = strcat(outdir,sgn,'_ncf_src',num2str(src-1),'_hr',num2str(i),'.mat');
             save(filename,"xc");
