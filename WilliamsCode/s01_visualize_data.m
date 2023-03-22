@@ -4,6 +4,7 @@ close all
 %datafile = './data/Fs1Hz_dx10m_Belgium_data.mat';
 datafile = './data/Fs1Hz_dx10m_Tarifa_data.mat';
 %datafile = './data/Fs1Hz_dx10m_A23_data.mat';
+%datafile = './data/Fs5Hz_dx10m_A23_data.mat';
 
 %Flag to save plots
 save_plots = true;
@@ -16,6 +17,7 @@ dx = 10; %channel spacin (m)
 
 %% Plot raw data
 load(datafile);
+disp('Data loaded');
 
 %Create distance and time axis arrays
 x = (0:nx-1)*dx;
