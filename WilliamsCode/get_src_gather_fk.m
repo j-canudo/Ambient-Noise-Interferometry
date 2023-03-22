@@ -1,4 +1,4 @@
-function trxc = get_src_gather_fk(data, src, rec_arr, nnx, nns, nnw, nwn, nov, fmin, fmax, fs, dx, sgn)
+function trxc = get_src_gather_fk(data, src, rec_arr, nnx, nns, nnw, nwn, nov, fmin, fmax, fs, dx, sgn,vel)
     [~,src_idx] = min(abs(rec_arr-src));
     nc = length(rec_arr);
     trxc = zeros(nc,nns);
@@ -9,7 +9,7 @@ function trxc = get_src_gather_fk(data, src, rec_arr, nnx, nns, nnw, nwn, nov, f
             tr(ic,:) = detrend(tr(ic,:));
             tr(ic,:) = bp(tr(ic,:),fmin,fmax,fs);
         end
-        tr = fk_filt(tr,fs,dx,sgn,[]);
+        tr = fk_filt(tr,fs,dx,sgn,vel);
         sp = zeros(nc,nnw);
         for ic=1:nc
             sp(ic,:) = rfft(tr(ic,:));
