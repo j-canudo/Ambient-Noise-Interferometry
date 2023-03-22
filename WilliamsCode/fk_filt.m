@@ -2,6 +2,9 @@ function tr_out = fk_filt(tr_in,fs,dx,sgn,vel)
     if isempty(vel)
         cmin = 5;
         cmax = 50;
+    else
+        cmin = vel(1);
+        cmax = vel(2);
     end
     if isempty(sgn)
         sgn = 'pos';
