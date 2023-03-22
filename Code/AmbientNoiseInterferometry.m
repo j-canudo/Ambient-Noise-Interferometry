@@ -1,22 +1,21 @@
 clear all;
 %close all;
-path = 'F:\Submarino\Tanda5';
+path = 'D:\';
 save_path = 'C:\Users\Usuario\Desktop\JCanudo\Resultados\VariablesClasificar';
 c = HDASdata(path);
-c.setFileConfiguration(1,70);
-c.time_to_correlate = 60*10;
-c.time_to_stack = c.time_to_correlate;
-total_files = 10;
+c.setFileConfiguration(1,30);
+c.time_to_correlate = 60*45;
+c.time_to_stack = 60*45;
+total_files = 9000;
 
 for i=1:total_files/c.number_of_files
     fprintf('Iteration %d of %d\n',i,total_files/c.number_of_files);
     c.getStrain2D;
-    c.choppData(300,330);
+    c.choppData(300,500);
     c.downsampleData(1);
-    %c.highPassFilter(0.05,[]);
-    %c.lowPassFilter(30,[]);
-    c.FKfilter(5,50,'neg',[]);
-    %c.filterFK([],[],[5 20],'both','keep');
+    c.detrendData;
+    c.bandPassFilter([0.03,0.3],[]);
+    %c.FKfilter(5,50,'neg',[]);
     c.whiten(0.03,0.3);
     %c.temporalNormalization;
 %     c.smoothData(2);
@@ -36,6 +35,6 @@ c.plotNCF_perChannel;
 c.plotPWS;
 c.plotPWS_perChannel;
 
-c.calculateDispersionVelocity([5 20],[]);
+c.calculateDispersionVelocity([5 20],60);
 c.plotDispersionVelocity;
 c.displayComputationTime;
