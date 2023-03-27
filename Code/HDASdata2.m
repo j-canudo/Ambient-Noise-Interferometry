@@ -1,4 +1,4 @@
-classdef HDASdata < handle
+classdef HDASdata2 < handle
     properties
         data_path
         FileHeader
@@ -51,7 +51,7 @@ classdef HDASdata < handle
     end
 
     methods
-        function obj = HDASdata(path)
+        function obj = HDASdata2(path)
             tic;
             obj.data_path = path;
             obj.files_dir = dir(path);
