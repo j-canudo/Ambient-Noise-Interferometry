@@ -1,18 +1,19 @@
 clear all
 close all
 
-%datafile = './data/Fs1Hz_dx10m_Belgium_data.mat';
-datafile = './data/Fs1Hz_dx10m_Tarifa_data.mat';
+datafile = './data/Fs1Hz_dx10m_Belgium_data.mat';
+%datafile = './data/Fs1Hz_dx10m_Tarifa_data.mat';
 %datafile = './data/Fs1Hz_dx10m_A23_data.mat';
 %datafile = './data/Fs5Hz_dx10m_A23_data.mat';
+datafile = './data/Fs1Hz_dx10m_Sismico_data.mat';
 
 %Flag to save plots
 save_plots = true;
 
 %Parameters
 nx = 1000; %number of channels
-ns = 4200; %number of samples
-fs = 1; %sampling rate (Hz)
+ns = 42000; %number of samples
+fs = 10; %sampling rate (Hz)
 dx = 10; %channel spacin (m)
 
 %% Plot raw data
@@ -88,8 +89,8 @@ clim([vmin vmax]);
 xlim([0 max(f)]);
 hold on;
 plot(f_OSGW,k,'k--');
-xlabel('Distance (m)');
-ylabel('Time (s)');
+xlabel('Frequency (Hz)');
+ylabel('Wavenumber (m^{-1})');
 title('Raw DAS data');
 
 % adjust spacing between subplots

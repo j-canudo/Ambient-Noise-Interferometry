@@ -5,7 +5,7 @@ save_plots = true;
 
 %Set path and source gather to plot
 ncfdir = './ncfs/';
-src = 100;
+src = 300;
 
 %Set parameters
 nx = 200; %Number of channels in source gather

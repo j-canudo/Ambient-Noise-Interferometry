@@ -5,7 +5,7 @@ save_plots = true;
 
 %Set path and source gather to plot
 ncfdir = './ncfs/';
-src = 100;
+src = 300;
 
 %Set parameters
 nx = 200; %Number of channels in source gather
@@ -43,8 +43,8 @@ ncf_com = cat(2,ncf_neg(:,1:floor(ns/2)-1),ncf_pos(:,floor(ns/2):end));
 vmin = 5; %Velocity range
 vmax = 20;
 vstep = 0.1;
-fmin = 0.04; %Frequency range
-fmax = 0.2;
+fmin = 0.03; %Frequency range
+fmax = 2.4;
 xmax = 400; %Offset to calculate dispersion (m)
 tmax = 128; %Time to calculate dispersion (s) (It also sets the frequency resolution)
 
