@@ -8,7 +8,7 @@ classdef HDASdata2 < handle
         files_dir
         Spatial_Sampling_Meters = 0;
         N_Processed_Points = 0;
-        Trigger_Frequency = 0;
+        Trigger_Frequency
         FiberRefStart = 0;
         FiberRefStop = 0;
         signal_type = 0; %1 if artificial signal
@@ -20,11 +20,10 @@ classdef HDASdata2 < handle
         Data_Matrix
         Reference_Matrix
         FFT2D
-        S_MS
-        phase_MS
         gamma = 1;
         PWS
-        NCF_total
+        NCF
+        NCF_phase
         stacked_files = 0;
         timeInStrain2D
         FK
@@ -37,8 +36,6 @@ classdef HDASdata2 < handle
         w
         c
         max_dispersion_velocities
-        nSamplesWindow
-        nSamplesOverlap
         cmapHDASdata
         nSamplesCorrelate
         nSamplesStack
@@ -46,11 +43,9 @@ classdef HDASdata2 < handle
         fmax
         vmin
         vmax
-        spxc
-        xc
     end
 
-    methods
+    methods (Access = public)
         function obj = HDASdata2(path)
             tic;
             obj.data_path = path;
@@ -314,35 +309,6 @@ classdef HDASdata2 < handle
             end
         end
 
-        function obj = removeMean(obj)
-            strain_mean = mean(obj.Strain2D,2);
-            obj.Strain2D = obj.Strain2D-strain_mean;
-        end
-
-        function obj = hannData(obj)
-            H = hann(size(obj.Strain2D,2)).';
-            obj.Strain2D = bsxfun(@times,obj.Strain2D,H);
-        end
-
-        function obj = smoothData(obj,percentage)
-            %Horizontal smooth
-            smooth_window = ones(1,size(obj.Strain2D,2));
-            hann_window = hann(ceil(size(obj.Strain2D,2)*percentage/100*2));
-
-            smooth_window(1,1:floor((percentage/100)*size(obj.Strain2D,2))) = hann_window(1:floor(end/2),1);
-            smooth_window(1,floor(((100-percentage)/100)*size(obj.Strain2D,2))+1:end) = hann_window(floor(end/2)+1:end,1);
-
-            obj.Strain2D = bsxfun(@times,obj.Strain2D,smooth_window);
-            %Vertical smooth
-            smooth_window = ones(size(obj.Strain2D,1),1);
-            hann_window = hann(ceil(size(obj.Strain2D,1)*percentage/100*2));
-
-            smooth_window(1:floor((percentage/100)*size(obj.Strain2D,1)),1) = hann_window(1:floor(end/2),1);
-            smooth_window(floor(((100-percentage)/100)*size(obj.Strain2D,1))+1:end,1) = hann_window(floor(end/2)+1:end,1);
-
-            obj.Strain2D = bsxfun(@times,obj.Strain2D,smooth_window);
-        end
-
         function obj = setFileConfiguration(obj, initial_file, file_number)
             obj.first_file = initial_file;
             obj.number_of_files = file_number;
@@ -379,128 +345,6 @@ classdef HDASdata2 < handle
 %             obj.Strain2D(~mask) = -1;
         end
 
-        function obj = spectralWhitening(obj)
-            obj.FFT;
-            smoothed_amplitudes = smoothdata(abs(obj.FFT2D),1,'movmean',20);
-            obj.FFT2D = obj.FFT2D./smoothed_amplitudes;
-            obj.FFT2D(isnan(obj.FFT2D)) = 0;
-            obj.Strain2D = real(ifft(ifftshift(obj.FFT2D,2),[],2));
-            max_value = max(abs(obj.Strain2D),[],2);
-            obj.Strain2D = bsxfun(@rdivide,obj.Strain2D,max_value);
-%             obj.FFT;
-%             obj.FFT2D = obj.FFT2D./abs(obj.FFT2D);
-%             obj.FFT2D(isnan(obj.FFT2D)) = 0;
-%             obj.Strain2D = real(ifft(ifftshift(obj.FFT2D,2),[],2));
-%             max_value = max(abs(obj.Strain2D),[],2);
-%             obj.Strain2D = bsxfun(@rdivide,obj.Strain2D,max_value);
-        end
-
-        function obj = whiten(obj,fmin,fmax)
-            obj.FFT;
-            %sp = obj.rfft(obj.Strain2D);
-            %N = (size(sp,2)-1)*2;
-            N = size(obj.FFT2D,2);
-            i1 = N/2+ceil(fmin/(obj.Trigger_Frequency/N));
-            i2 = N/2+ceil(fmax/(obj.Trigger_Frequency/N));
-
-            obj.FFT2D(:,N/2+1:i1) = cos(linspace(pi/2,pi,i1-N/2)).^2 .* exp(1i*angle(obj.FFT2D(:,N/2+1:i1)));
-            obj.FFT2D(:,N-i1+1:N/2) = cos(linspace(pi,pi/2,i1-N/2)).^2 .* exp(1i*angle(obj.FFT2D(:,N-i1+1:N/2)));
-            obj.FFT2D(:,i1:i2) = exp(1i*angle(obj.FFT2D(:,i1:i2)));
-            obj.FFT2D(:,N-i2:N-i1) = exp(1i*angle(obj.FFT2D(:,N-i2:N-i1)));
-            obj.FFT2D(:,i2:end) = cos(linspace(pi,pi/2,size(obj.FFT2D,2)-i2+1)).^2 .* exp(1i*angle(obj.FFT2D(:,i2:end)));
-            obj.FFT2D(:,1:N-i2+1) = cos(linspace(pi/2,pi,size(obj.FFT2D,2)-i2+1)).^2 .* exp(1i*angle(obj.FFT2D(:,1:N-i2+1)));
-            obj.Strain2D = real(ifft(ifftshift(obj.FFT2D,2),[],2));
-        end
-
-        function NCF = crossCorrelationTimeDomain(obj,strain)
-            NCF = zeros(obj.N_Processed_Points,size(strain,2)*2-1);
-            for i=1:obj.N_Processed_Points
-                NCF(i,:) = xcorr(strain(1,:),strain(i,:));
-            end
-        end
-
-        function NCF = crossCorrelationFrequencyDomain(obj,strain)
-            NCF = zeros(size(strain,1),size(strain,2)*2-1);
-            a = [zeros(1,length(strain(1,:))-1) strain(1,:)];
-            FFT_CH1 = fft(a);
-            for i=1:obj.N_Processed_Points
-                b = [strain(i,:) zeros(1,length(strain(i,:))-1)];
-                FFT_CH2 = fft(b);
-                NCF(i,:) = real(ifft(FFT_CH1.*conj(FFT_CH2)));
-            end
-        end
-
-        function obj = stackPWS(obj,NCF)
-            if isempty(obj.S_MS)
-                obj.S_MS = zeros(size(NCF));
-            end
-            if isempty(obj.phase_MS)
-                obj.phase_MS = zeros(size(NCF));
-            end
-            analytic = (hilbert(NCF.')).';
-            phase = analytic./abs(analytic);
-            %phase = angle(analytic);
-            %phase = unwrap(phase);
-
-            obj.S_MS = obj.S_MS + NCF;
-            %obj.phase_MS = obj.phase_MS + exp(1i*phase);
-            obj.phase_MS = obj.phase_MS + phase;
-        end
-
-        function obj = correlateAndStackStandard(obj)
-            NCF = zeros(obj.N_Processed_Points,size(obj.Strain2D,2)*2-1);
-            if isempty(obj.PWS)
-                obj.NCF_total = zeros(size(NCF));
-            end
-            for i=1:obj.N_Processed_Points
-                NCF(i,:) = xcorr(obj.Strain2D(1,:),obj.Strain2D(i,:));
-            end
-            obj.NCF_total = obj.NCF_total + flip(NCF,2);
-        end
-
-        function obj = correlateAndStackPWS(obj)
-            for j=1:obj.number_of_files/(obj.time_to_stack/60)
-                for i=1:obj.time_to_stack/obj.time_to_correlate
-                    strain = obj.Strain2D(:,(j-1)*obj.time_to_stack*obj.Trigger_Frequency+(i-1)*obj.Trigger_Frequency*obj.time_to_correlate+1:i*obj.Trigger_Frequency*obj.time_to_correlate+(j-1)*obj.time_to_stack*obj.Trigger_Frequency);
-                    NCF = obj.crossCorrelationTimeDomain(strain);
-                    %NCF = obj.crossCorrelationFrequencyDomain(strain);
-                    obj.stackPWS(NCF);
-                end
-                obj.stacked_files = size(obj.Strain2D,2)/obj.N_Time_Samples;
-                obj.processed_files = obj.processed_files + obj.stacked_files;
-                obj.calculatePWS;
-            end
-        end
-
-        function obj = calculatePWS(obj)
-            if isempty(obj.PWS)
-                obj.PWS = zeros(size(obj.S_MS));
-            end
-            x = ((abs(obj.phase_MS)/obj.stacked_files).^obj.gamma).*(obj.S_MS/(obj.stacked_files));
-            obj.PWS = obj.PWS + flip(x,2);
-            obj.phase_MS = [];
-            obj.S_MS = [];
-            obj.stacked_files = 0;
-        end
-
-        function obj = resetPWS(obj)
-            obj.PWS = [];
-            obj.S_MS = [];
-            obj.phase_MS = [];
-            obj.stacked_files = 0;
-            obj.processed_files = 0;
-        end
-
-        function obj = savePWSdata_artificial(obj)
-            if ismember(obj.processed_files,[60 720 1440 2880 10080 21600 44640])
-                S_MS_save = obj.S_MS;
-                c_save = obj.phase_MS;
-                n_save = obj.processed_files;
-                file_name = strcat('PWSdata_',num2str(n_save),'.mat');
-                save(file_name,'S_MS_save','c_save','n_save');
-            end
-        end
-
         function obj = savePWSdata(obj,file_number,path)
             if mod(obj.processed_files,file_number) == 0
                 PWS = obj.PWS;
@@ -508,80 +352,6 @@ classdef HDASdata2 < handle
                 file_name = strcat(path,'\A23PWS_',num2str(n),'files.mat');
                 save(file_name,'PWS','n');
             end
-        end
-
-        function obj = plotNCF(obj)
-            time_axis = linspace(-obj.time_to_correlate,obj.time_to_correlate,size(obj.NCF_total,2));
-            offset_axis = linspace(0,obj.N_Processed_Points*obj.Spatial_Sampling_Meters,obj.N_Processed_Points);
-
-            figure(4);
-            imagesc(offset_axis,time_axis,obj.NCF_total.');
-            colormap(obj.cmapHDASdata);
-            colorbar;
-            xlabel('Offset (m)');
-            ylabel('Time (s)');
-            title('NCF Standard');
-            set(gca,'YDir','normal');
-            clim([-1e3 1e3]);
-        end
-
-        function obj = plotPWS(obj)
-            time_axis = linspace(-obj.time_to_correlate,obj.time_to_correlate,size(obj.PWS,2));
-            offset_axis = linspace(0,obj.N_Processed_Points*obj.Spatial_Sampling_Meters,obj.N_Processed_Points);
-
-            figure(5);
-            imagesc(offset_axis,time_axis,obj.PWS.');
-            colormap(obj.cmapHDASdata);
-            colorbar;
-            xlabel('Offset (m)');
-            ylabel('Time (s)');
-            title('PWS');
-            set(gca,'YDir','normal');
-            clim([-1e3 1e3]);
-        end
-
-        function obj = plotNCF_perChannel(obj)
-            time_axis = linspace(-obj.time_to_correlate,obj.time_to_correlate,size(obj.NCF_total,2));
-            k=0;
-            NCF_plot = zeros(size(obj.NCF_total));
-            for i=1:size(obj.NCF_total,1)
-                NCF_plot(i,:) = obj.NCF_total(i,:)/max(abs(obj.NCF_total(i,:)))*5+k*obj.Spatial_Sampling_Meters;
-                k=k+1;
-            end
-            figure(6);
-            for i=1:size(obj.NCF_total,1)
-                plot(time_axis,NCF_plot(i,:));
-                hold on;
-            end
-            hold off;
-            xlabel('Time lag(s)');
-            ylabel('Offset (m)');
-            title('NCF Standard');
-            set(gca,'YDir','normal');
-            xlim([-obj.time_to_correlate obj.time_to_correlate]);
-            ylim([-5 obj.N_Processed_Points*obj.Spatial_Sampling_Meters+5]);
-        end
-
-        function obj = plotPWS_perChannel(obj)
-            time_axis = linspace(-obj.time_to_correlate,obj.time_to_correlate,size(obj.PWS,2));
-            k=0;
-            PWS_plot = zeros(size(obj.PWS));
-            for i=1:size(obj.PWS,1)
-                PWS_plot(i,:) = obj.PWS(i,:)/max(abs(obj.PWS(i,:)))*5+k*obj.Spatial_Sampling_Meters;
-                k=k+1;
-            end
-            figure(7);
-            for i=1:size(obj.PWS,1)
-                plot(time_axis,PWS_plot(i,:));
-                hold on;
-            end
-            hold off;
-            xlabel('Time lag(s)');
-            ylabel('Offset (m)');
-            title('PWS');
-            set(gca,'YDir','normal');
-            xlim([-obj.time_to_correlate obj.time_to_correlate]);
-            ylim([-5 obj.N_Processed_Points*obj.Spatial_Sampling_Meters+5]);
         end
 
         function obj = plotWaterfall(obj,waterfall_window_length,freq_min,freq_max)
@@ -623,76 +393,6 @@ classdef HDASdata2 < handle
             set(gca,'YDir','normal');
             clim([1e2 1e6]);
             colorbar;
-        end
-
-        function obj = FKfilter(obj,cmin,cmax,direction,keep)
-            Nx = size(obj.Strain2D,1);
-            Ns = size(obj.Strain2D,2);
-            f0 = obj.fftfreq(Ns,obj.Trigger_Frequency);
-            k0 = obj.fftfreq(Nx,1/obj.Spatial_Sampling_Meters);
-
-            obj.calculateFK;
-            [F,K] = meshgrid(f0,k0);
-            C = F./K;
-            filt = zeros(size(obj.FK));
-            
-            if isequal(direction,'pos')
-                filt((C > cmin) & (C < cmax)) = 1;
-            end
-            if isequal(direction,'neg')
-                filt((C < -cmin) & (C > -cmax)) = 1;
-            end
-            if isempty(direction)
-                filt(((C > cmin) & (C < cmax)) || ((C < -cmin) & (C > -cmax))) = 1;
-            end
-
-            if isequal(keep,'discard')
-                filt = double(~logical(filt));
-            end
-
-            filt = imgaussfilt(filt,3);
-            obj.FK = obj.FK.*filt;
-            obj.Strain2D = real(ifft2(ifftshift(obj.FK)));
-        end
-
-        function obj = normalizeFK(obj,freq,k)
-            if isempty(obj.FK)
-                obj.calculateFK;
-            end
-            if freq
-                max_values = max(abs(obj.FK),[],1);
-                max_values(1:length(max_values)/2) = 1;
-                obj.FK = bsxfun(@rdivide,obj.FK,max_values);
-            end
-            if k
-                max_values = max(abs(obj.FK),[],2);
-                obj.FK = bsxfun(@rdivide,obj.FK,max_values);
-            end
-        end
-
-        function obj = stackFK(obj)
-            if isempty(obj.stackedFK)
-                obj.stackedFK = zeros(size(obj.FK));
-            end
-            obj.stackedFK = obj.stackedFK + obj.FK;
-            obj.stacked_files = obj.stacked_files + obj.number_of_files;
-        end
-
-        function obj = saveFK(obj,n_files)
-            if mod(obj.stacked_files,n_files) == 0
-                stackFK = obj.stackedFK;
-                n = obj.stacked_files;
-                save('stackFK.mat','stackFK','n');
-            end
-        end
-
-        function obj = keepStrainChannelsPair(obj, first_channel, second_channel)
-            x1 = obj.Strain2D(first_channel,:);
-            x2 = obj.Strain2D(second_channel,:);
-            obj.Strain2D = zeros(2,length(x1));
-            obj.Strain2D(1,:) = x1;
-            obj.Strain2D(2,:) = x2;
-            obj.N_Processed_Points = 2;
         end
 
         function obj = findInfty(obj)
@@ -752,10 +452,6 @@ classdef HDASdata2 < handle
             plot(obj.w,obj.max_dispersion_velocities(1,:),'ro');
         end
 
-        function obj = cleanZeroRow(obj)
-            obj.PWS(:,round(size(obj.PWS,2)/2)) = zeros(size(obj.PWS,1),1);
-        end
-
         function obj = downsampleData(obj, new_frequency)
             if mod(obj.Trigger_Frequency,new_frequency) ~= 0
                 x = round(obj.Trigger_Frequency/new_frequency);
@@ -772,58 +468,67 @@ classdef HDASdata2 < handle
             obj.Strain2D = Strain2D_downsampled;
         end
 
-        function obj = calculateDispersionVelocityFK(obj,w,vel)
-            if isempty(obj.FK)
-                error('No FK calculated. Ending.');
-            end
 
-            k_axis = linspace(-1/obj.Spatial_Sampling_Meters/2,1/obj.Spatial_Sampling_Meters/2,size(obj.FK,1));
-            f_axis = linspace(-obj.Trigger_Frequency/2,obj.Trigger_Frequency/2,size(obj.FK,2));
-            v_matrix = k_axis.'*(1./f_axis);
-            delta_f = obj.Trigger_Frequency/size(obj.FK,2);
-            delta_k = (1/obj.Spatial_Sampling_Meters)/size(obj.FK,1);
-            delta_v = delta_f/delta_k;
-
-            obj.c = [vel(1):delta_v:vel(2)];
-            obj.w = [-w:delta_f:w];
-            obj.dispersionVelocity2D = zeros(length(obj.c),length(obj.w));
-
-            for i=1:length(obj.c)
-                v_min = 1/obj.c(i);
-                v_max = v_min + delta_v;
-
-                mask1 = v_matrix<v_min;
-                mask1 = mask1 & v_matrix>-v_min;
-                mask2 = v_matrix>v_max;
-                mask2 = mask2 | v_matrix<-v_max;
-                mask = mask1 & mask2;
-
-                x = obj.FK;
-                x(~mask) = 0;
-
-                for j=1:length(obj.w)
-                    obj.dispersionVelocity2D(i,j) = sum(abs(x(:,size(x,2)/2+(obj.w(j)/delta_f))));
-                end
-            end
-
-            obj.dispersionVelocity2D = obj.dispersionVelocity2D.';
-
-            obj.max_dispersion_velocities = zeros(1,length(obj.w));
-            for i=1:length(obj.w)
-                [~,index] = max(abs(obj.dispersionVelocity2D(i,:)));
-                obj.max_dispersion_velocities(1,i) = obj.c(index);
-            end
-        end
-
-        function obj = setANIConfiguration(obj, nSamplesPerWindow, nSamplesOverlap, samplesToCorrelate, samplesToStack, fmin, fmax, vmin, vmax)
-            obj.nSamplesWindow = nSamplesPerWindow;
-            obj.nSamplesOverlap = nSamplesOverlap;
+        function obj = setANIConfiguration(obj, first_file, samplesToCorrelate, samplesToStack, fmin, fmax, vmin, vmax)
             obj.nSamplesCorrelate = samplesToCorrelate;
             obj.nSamplesStack = samplesToStack;
             obj.fmin = fmin;
             obj.fmax = fmax;
             obj.vmin = vmin;
             obj.vmax = vmax;
+            obj.first_file = first_file;
+            if isempty(obj.Trigger_Frequency)
+                nfiles = ceil((samplesToStack/250)/60);
+            else
+                nfiles = ceil((samplesToStack/obj.Trigger_Frequency)/60);
+            end
+            obj.number_of_files = nfiles;
+        end
+
+        function obj = correlateAndStack(obj)
+            if isempty(obj.NCF)
+                obj.NCF = zeros(size(obj.Strain2D,1),obj.nSamplesCorrelate);
+                obj.NCF_phase = zeros(size(obj.Strain2D,1),obj.nSamplesCorrelate);
+            end
+            obj.stacked_files = obj.nSamplesStack/obj.nSamplesCorrelate;
+            for i=1:obj.stacked_files
+                xc = obj.getXCGather(obj.Strain2D(:,(i-1)*obj.nSamplesCorrelate+1:i*obj.nSamplesCorrelate),obj.fmin,obj.fmax,obj.vmin,obj.vmax,obj.Trigger_Frequency,obj.Spatial_Sampling_Meters ...
+                    ,[]);
+                obj.NCF = obj.NCF + xc;
+                analytic = (hilbert(obj.NCF.')).';
+                obj.NCF_phase = obj.NCF_phase + analytic./abs(analytic);
+            end
+            if isempty(obj.PWS)
+                obj.PWS = zeros(size(obj.NCF));
+            end
+            stack = ((abs(obj.NCF_phase)/obj.stacked_files).^obj.gamma).*(obj.NCF/(obj.stacked_files));
+            stack = cat(2,stack(:,floor(obj.nSamplesCorrelate/2):end),stack(:,1:floor(obj.nSamplesCorrelate/2)-1));
+            obj.PWS = obj.PWS + stack;
+            obj.first_file = obj.first_file-(obj.number_of_files-1);
+        end
+
+        function obj = plotPWS(obj)
+            time_axis = linspace(-obj.nSamplesCorrelate/2/obj.Trigger_Frequency,obj.nSamplesCorrelate/2/obj.Trigger_Frequency,size(obj.PWS,2));
+            offset_axis = linspace(0,obj.N_Processed_Points*obj.Spatial_Sampling_Meters,obj.N_Processed_Points);
+
+            figure(5);
+            imagesc(offset_axis,time_axis,obj.PWS.');
+            colormap(obj.cmapHDASdata);
+            colorbar;
+            xlabel('Offset (m)');
+            ylabel('Time (s)');
+            title('PWS');
+            set(gca,'YDir','normal');
+            max_value = max(abs(obj.PWS(:)));
+            clim([-max_value/5 max_value/5]);
+            xlim([0 obj.N_Processed_Points*obj.Spatial_Sampling_Meters/2]);
+
+            %Fk filter velocities display
+            vmin = 1/obj.vmin*offset_axis;
+            vmax = 1/obj.vmax*offset_axis;
+            hold on;
+            plot(offset_axis,vmin,'g');
+            plot(offset_axis,vmax,'g');
         end
     end
 
@@ -865,27 +570,6 @@ classdef HDASdata2 < handle
             y  = real(ifft(xn));
         end
 
-        function xc = getXCGather(data,fmin,fmax,vmin,vmax,fs,dx,sgn)
-            for i=1:size(data,1)
-                data(i,:) = obj.detrendData(data(i,:));
-                data(i,:) = obj.bp(data(i,:),fmin,fmax,fs);
-            end
-            data = obj.fk_filt(data,fs,dx,vmin,vmax,sgn);
-            sp = zeros(size(data));
-            for i=1:size(data,1)
-                sp(i,:) = obj.rfft(data(i,:));
-                sp(i,:) = obj.whiten2(sp(i,:),fs,fmin,fmax);
-            end
-            spxc = zeros(size(data));
-            for i=1:size(data,1)
-                spxc(i,:) = conj(sp(i,:)) .* sp(1,:);
-            end
-            xc = zeros(size(obj.spxc));
-            for i=1:size(data,1)
-                xc(i,:) = obj.irfft(obj.spxc(i,:));
-            end
-        end
-
         function out = detrendData(in)
             x = 1:size(in,2);
             out = zeros(size(in));
@@ -894,6 +578,27 @@ classdef HDASdata2 < handle
                 m = (sum(x.*y)-sum(x)*sum(y)/numel(x))/(sum(x.^2)-sum(x)^2/numel(x));
                 b = mean(y) - m*mean(x);
                 out(i,:) = y - (m*x + b);
+            end
+        end
+
+        function xc = getXCGather(data,fmin,fmax,vmin,vmax,fs,dx,sgn)
+            for i=1:size(data,1)
+                data(i,:) = HDASdata2.detrendData(data(i,:));
+                data(i,:) = HDASdata2.bp(data(i,:),fmin,fmax,fs);
+            end
+            data = HDASdata2.fk_filt(data,fs,dx,vmin,vmax,sgn);
+            sp = zeros(size(data,1),size(data,2)/2+1);
+            for i=1:size(data,1)
+                sp(i,:) = HDASdata2.rfft(data(i,:));
+                sp(i,:) = HDASdata2.whiten2(sp(i,:),fs,fmin,fmax);
+            end
+            spxc = zeros(size(data,1),size(data,2)/2+1);
+            for i=1:size(data,1)
+                spxc(i,:) = conj(sp(i,:)) .* sp(1,:);
+            end
+            xc = zeros(size(data));
+            for i=1:size(data,1)
+                xc(i,:) = HDASdata2.irfft(spxc(i,:));
             end
         end
 
