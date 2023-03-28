@@ -2,8 +2,8 @@ clear all
 close all
 path = 'D:\';
 c = HDASdata2(path);
-c.setANIConfiguration(1,512,512*30,0.5,30,50,10000);
-total_files = 60*10;
+c.setANIConfiguration(80,512,512*30,10,20,100,5000);
+total_files = 60*24*15;
 
 for i=1:total_files/c.number_of_files
     fprintf('Iteration %d/%d\n',i,total_files/c.number_of_files);

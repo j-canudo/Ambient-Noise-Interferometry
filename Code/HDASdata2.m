@@ -486,10 +486,9 @@ classdef HDASdata2 < handle
         end
 
         function obj = correlateAndStack(obj)
-            if isempty(obj.NCF)
-                obj.NCF = zeros(size(obj.Strain2D,1),obj.nSamplesCorrelate);
-                obj.NCF_phase = zeros(size(obj.Strain2D,1),obj.nSamplesCorrelate);
-            end
+            obj.NCF = zeros(size(obj.Strain2D,1),obj.nSamplesCorrelate);
+            obj.NCF_phase = zeros(size(obj.Strain2D,1),obj.nSamplesCorrelate);
+
             obj.stacked_files = obj.nSamplesStack/obj.nSamplesCorrelate;
             for i=1:obj.stacked_files
                 xc = obj.getXCGather(obj.Strain2D(:,(i-1)*obj.nSamplesCorrelate+1:i*obj.nSamplesCorrelate),obj.fmin,obj.fmax,obj.vmin,obj.vmax,obj.Trigger_Frequency,obj.Spatial_Sampling_Meters ...
@@ -529,6 +528,26 @@ classdef HDASdata2 < handle
             hold on;
             plot(offset_axis,vmin,'g');
             plot(offset_axis,vmax,'g');
+        end
+
+        function obj = plotSpectrum(obj)
+            spec = zeros(size(obj.Strain2D)/2+1);
+            for i=1:size(obj.Strain2D,1)
+                spec(i,:) = 20*log10(abs(HDASdata2.rfft(obj.Strain2D(i,:))));
+            end
+            
+            figure(4);
+            set(gca, 'Position', [0 0 1000 500]);
+            %Plot spectrum along cable
+            ax = axes;
+            pcolor(ax, linspace(0,size(obj.Strain2D,1)*obj.Spatial_Sampling_Meters,size(obj.Strain2D,1)), linspace(0,obj.Trigger_Frequency/2,size(obj.Strain2D,2)/2+1), spec');
+            shading interp;
+            colormap(ax, 'parula');
+            ylim([0 20]);
+            clim(ax, [10 90]);
+            xlabel(ax, 'Distance (m)');
+            ylabel(ax, 'Frequency (Hz)');
+            title(ax, 'Spectrum vs. distance');
         end
     end
 
@@ -647,6 +666,14 @@ classdef HDASdata2 < handle
             spc(1:i1) = cos(linspace(pi/2,pi,i1)).^2 .* exp(1i*angle(spc(1:i1)));
             spc(i1:i2) = exp(1i*angle(spc(i1:i2)));
             spc(i2:end) = cos(linspace(pi,pi/2,length(spc)-i2+1)).^2 .* exp(1i*angle(spc(i2:end)));
+        end
+
+        function y = tempNormalization(x)
+            y = zeros(size(x));
+            mask = x > 0;
+            y(mask) = 1;
+            mask = x < 0;
+            y(mask) = -1; 
         end
     end
 end
